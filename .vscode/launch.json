@@ -1,0 +1,65 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "List backups",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/manage_postgres_db.py",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            },
+            "args": [
+                "--configfile", "sample.config",
+                "--action", "list"
+            ],
+        },
+        {
+            "name": "Create backup",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/manage_postgres_db.py",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            },
+            "args": [
+                "--configfile", "sample.config",
+                "--action", "backup"
+            ],
+        },
+        {
+            "name": "Restore backup over existing DB",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/manage_postgres_db.py",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            },
+            "args": [
+                "--configfile", "sample.config",
+                "--action", "restore",
+                "--date", "20191017"
+            ],
+        },
+        {
+            "name": "Restore backup into new DB",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/manage_postgres_db.py",
+            "console": "integratedTerminal",
+            "env": {
+                "APP_SETTINGS": "project.config.DevelopmentConfig",
+                "PYTHONPATH": "${workspaceRoot}"
+            },
+            "args": [
+                "--configfile", "sample.config",
+                "--action", "restore",
+                "--date", "20191017",
+                "--dest-db", "restored_database"
+            ],
+        },
+    ]
+}

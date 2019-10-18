@@ -104,3 +104,10 @@ ENV/
 
 # JetBrains
 .idea
+
+# Vscode
+.vscode/settings.json
+.vscode/.ropeproject
+
+# Local backups
+/backups
