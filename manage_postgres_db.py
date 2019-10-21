@@ -324,7 +324,7 @@ def main():
         'LOCAL_BACKUP_PATH': local_storage_path
     }
 
-    local_file_path = '{}{}'.format(manager_config.get('BACKUP_PATH'), filename)
+    local_file_path = '{}{}'.format(manager_config.get('BACKUP_PATH'), filename)  # temporary_file_path
 
     # list task
     if args.action == "list":
