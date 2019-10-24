@@ -1,8 +1,10 @@
 #!/usr/bin/python3
 import argparse
+import datetime
 import logging
 import subprocess
 import os
+import shutil
 import tempfile
 from tempfile import mkstemp
 
@@ -15,49 +17,50 @@ from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 # Amazon S3 settings.
 # AWS_ACCESS_KEY_ID  in ~/.aws/credentials
 # AWS_SECRET_ACCESS_KEY in ~/.aws/credentials
-import datetime
-
-import shutil
-
-AWS_BUCKET_NAME = 'backup.mydomain.com'
-AWS_BUCKET_PATH = 'postgres/'
-BACKUP_PATH = '/tmp/'
-LOCAL_BACKUP_PATH = './backups/'
 
 
-def upload_to_s3(file_full_path, dest_file):
+def upload_to_s3(file_full_path, dest_file, manager_config):
     """
     Upload a file to an AWS S3 bucket.
     """
     s3_client = boto3.client('s3')
     try:
-        s3_client.upload_file(file_full_path, AWS_BUCKET_NAME, AWS_BUCKET_PATH + dest_file)
+        s3_client.upload_file(file_full_path,
+                              manager_config.get('AWS_BUCKET_NAME'),
+                              manager_config.get('AWS_BUCKET_PATH') + dest_file)
         os.remove(file_full_path)
     except boto3.exceptions.S3UploadFailedError as exc:
         print(exc)
         exit(1)
 
 
-def download_from_s3(backup_s3_key, dest_file):
+def download_from_s3(backup_s3_key, dest_file, manager_config):
     """
     Upload a file to an AWS S3 bucket.
     """
     s3_client = boto3.resource('s3')
     try:
-        s3_client.meta.client.download_file(AWS_BUCKET_NAME, backup_s3_key, dest_file)
+        s3_client.meta.client.download_file(manager_config.get('AWS_BUCKET_NAME'), backup_s3_key, dest_file)
     except Exception as e:
         print(e)
         exit(1)
 
 
-def list_available_backup(storage_engine):
+def list_available_backups(storage_engine, manager_config):
     key_list = []
     if storage_engine == 'LOCAL':
-        backup_list = os.listdir(LOCAL_BACKUP_PATH)
+        try:
+            backup_folder = manager_config.get('LOCAL_BACKUP_PATH')
+            backup_list = os.listdir(backup_folder)
+        except FileNotFoundError:
+            print(f'Could not found {backup_folder} when searching for backups.'
+                  f'Check your .config file settings')
+            exit(1)
     elif storage_engine == 'S3':
         # logger.info('Listing S3 bucket s3://{}/{} content :'.format(aws_bucket_name, aws_bucket_path))
         s3_client = boto3.client('s3')
-        s3_objects = s3_client.list_objects_v2(Bucket=AWS_BUCKET_NAME, Prefix=AWS_BUCKET_PATH)
+        s3_objects = s3_client.list_objects_v2(Bucket=manager_config.get('AWS_BUCKET_NAME'),
+                                               Prefix=manager_config.get('AWS_BUCKET_PATH'))
         backup_list = [s3_content['Key'] for s3_content in s3_objects['Contents']]
 
     for bckp in backup_list:
@@ -200,8 +203,6 @@ def restore_postgres_db(db_host, db, port, user, password, backup_file, verbose)
         ]
 
         if verbose:
-            # What's the purpose of this line? I'd like to remove it, if you agree
-            # print(user, password, db_host, port, db)
             subprocess_params.append('-v')
 
         subprocess_params.append(backup_file)
@@ -260,9 +261,14 @@ def swap_after_restore(db_host, restore_database, new_active_database, db_port, 
         exit(1)
 
 
-def move_to_local_storage(comp_file, filename_compressed):
+def move_to_local_storage(comp_file, filename_compressed, manager_config):
     """ Move compressed backup into {LOCAL_BACKUP_PATH}. """
-    shutil.move(comp_file, f'{LOCAL_BACKUP_PATH}/{filename_compressed}')
+    backup_folder = manager_config.get('LOCAL_BACKUP_PATH')
+    try:
+        check_folder = os.listdir(backup_folder)
+    except FileNotFoundError:
+        os.mkdir(backup_folder)
+    shutil.move(comp_file, '{}{}'.format(manager_config.get('LOCAL_BACKUP_PATH'), filename_compressed))
 
 
 def main():
@@ -301,20 +307,29 @@ def main():
     postgres_restore = "{}_restore".format(postgres_db)
     postgres_user = config.get('postgresql', 'user')
     postgres_password = config.get('postgresql', 'password')
-    # aws_bucket_name = config.get('S3', 'bucket_name')
-    # aws_bucket_path = config.get('S3', 'bucket_backup_path')
+    aws_bucket_name = config.get('S3', 'bucket_name')
+    aws_bucket_path = config.get('S3', 'bucket_backup_path')
     storage_engine = config.get('setup', 'storage_engine')
     timestr = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
     filename = 'backup-{}-{}.dump'.format(timestr, postgres_db)
     filename_compressed = '{}.gz'.format(filename)
     restore_filename = '/tmp/restore.dump.gz'
     restore_uncompressed = '/tmp/restore.dump'
-    local_file_path = '{}{}'.format(BACKUP_PATH, filename)
+    local_storage_path = config.get('local_storage', 'path', fallback='./backups/')
+
+    manager_config = {
+        'AWS_BUCKET_NAME': aws_bucket_name,
+        'AWS_BUCKET_PATH': aws_bucket_path,
+        'BACKUP_PATH': '/tmp/',
+        'LOCAL_BACKUP_PATH': local_storage_path
+    }
+
+    local_file_path = '{}{}'.format(manager_config.get('BACKUP_PATH'), filename)
 
     # list task
     if args.action == "list":
-        s3_backup_objects = list_available_backup(storage_engine)
-        for key in s3_backup_objects:
+        backup_objects = sorted(list_available_backups(storage_engine, manager_config), reverse=True)
+        for key in backup_objects:
             logger.info("Key : {}".format(key))
     # list databases task
     elif args.action == "list_dbs":
@@ -343,11 +358,11 @@ def main():
         comp_file = compress_file(local_file_path)
         if storage_engine == 'LOCAL':
             logger.info('Moving {} to local storage...'.format(comp_file))
-            move_to_local_storage(comp_file, filename_compressed)
-            logger.info("Moved to {}{}".format(LOCAL_BACKUP_PATH, filename_compressed))
+            move_to_local_storage(comp_file, filename_compressed, manager_config)
+            logger.info("Moved to {}{}".format(manager_config.get('LOCAL_BACKUP_PATH'), filename_compressed))
         elif storage_engine == 'S3':
             logger.info('Uploading {} to Amazon S3...'.format(comp_file))
-            upload_to_s3(comp_file, filename_compressed)
+            upload_to_s3(comp_file, filename_compressed, manager_config)
             logger.info("Uploaded to {}".format(filename_compressed))
     # restore task
     elif args.action == "restore":
@@ -359,7 +374,7 @@ def main():
                 os.remove(restore_filename)
             except Exception as e:
                 logger.info(e)
-            all_backup_keys = list_available_backup(storage_engine)
+            all_backup_keys = list_available_backups(storage_engine, manager_config)
             backup_match = [s for s in all_backup_keys if args.date in s]
             if backup_match:
                 logger.info("Found the following backup : {}".format(backup_match))
@@ -370,11 +385,12 @@ def main():
 
             if storage_engine == 'LOCAL':
                 logger.info("Choosing {} from local storage".format(backup_match[0]))
-                shutil.copy(f'{LOCAL_BACKUP_PATH}/{backup_match[0]}', restore_filename)
+                shutil.copy('{}/{}'.format(manager_config.get('LOCAL_BACKUP_PATH'), backup_match[0]),
+                            restore_filename)
                 logger.info("Fetch complete")
             elif storage_engine == 'S3':
                 logger.info("Downloading {} from S3 into : {}".format(backup_match[0], restore_filename))
-                download_from_s3(backup_match[0], restore_filename)
+                download_from_s3(backup_match[0], restore_filename, manager_config)
                 logger.info("Download complete")
 
             logger.info("Extracting {}".format(restore_filename))

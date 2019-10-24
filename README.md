@@ -1,25 +1,32 @@
 # postgres_manage_python
 
-Utility to backup, restore and list Postgresql databases from/to AWS S3 using python
+Utility to backup, restore and list Postgresql databases from/to AWS S3 (or local storage) using python
 
 ## Getting Started
 
 ### Setup
 * Create and activate virtualenv
-              
+
       virtualenv -p python3 venv
       source venv/bin/activate
-            
+
 * Install dependencies
-     
-      pip3 install -r requirements.txt 
+
+      pip3 install -r requirements.txt
 
 * Create configuration file (ie. sample.config)
+
+      [setup]
+      # define if LOCAL or S3 storage will be used when storing/restoring the backup
+      storage_engine='S3'
 
       [S3]
       bucket_name="db_backups.s3.my.domain.com"  # S3 bucket name (no need for s3:// prefix)
       bucket_backup_path="postgres/"  # PATH in the bucket to store your backups
-      
+
+      [local_storage]
+      path=./backups/
+
       [postgresql]
       host=<your_psql_addr(probably 127.0.0.1)>
       port=<your_psql_port(probably 5432)>
@@ -32,19 +39,23 @@ Utility to backup, restore and list Postgresql databases from/to AWS S3 using py
 * List databases on a postgresql server
 
       python3 manage_postgres_db.py --configfile sample.config --action list_dbs --verbose true
-      
-* Create database backup and upload to S3 (based on config file details)
+
+* Create database backup and store it (based on config file details)
 
       python3 manage_postgres_db.py --configfile sample.config --action backup --verbose true
-      
-* List previously created database backups available on S3
+
+* List previously created database backups available on storage engine
 
       python3 manage_postgres_db.py --configfile sample.config --action list --verbose true
-      
-* Restore previously created database backups available on S3 (check available dates with *list* action)
+
+* Restore previously created database backups available on storage engine (check available dates with *list* action)
 
       python3 manage_postgres_db.py --configfile sample.config --action restore --date "YYYY-MM-dd" --verbose true
-      
+
+* Restore previously created database backups into a new destination database
+
+      python3 manage_postgres_db.py --configfile sample.config --action restore --date "YYYY-MM-dd" --dest-db new_DB_name
+
 ## Authors
 
 * **Val Feron** - *Initial work* - [github](https://github.com/valferon)
