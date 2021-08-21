@@ -49,12 +49,14 @@ class Processor:
             'list_dbs': pg_kwargs,
             'backup': {
                 **pg_kwargs,
+                'engine': 'local',
                 'config': aws_config,
                 'sql_file': filename,
                 'compressed_file': filename_compressed,
             },
             'restore': {
                 **pg_kwargs,
+                'engine': 'local',
                 'config': aws_config,
                 'db': self.sys_args.dest_db if self.sys_args.dest_db else pg_kwargs['db'],
                 'restore_db': postgres_restore,
@@ -65,7 +67,9 @@ class Processor:
         return services[self.sys_args.action]
 
     def get_config(self):
-        return configparser.ConfigParser().read(self.sys_args.configfile)
+        config = configparser.ConfigParser()
+        config.read(self.sys_args.configfile)
+        return config
 
     def get_sys_args(self):
         args_parser = argparse.ArgumentParser(description="Postgres Database Management")
