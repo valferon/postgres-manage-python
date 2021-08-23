@@ -14,7 +14,7 @@ class PostgresBackup:
 
         return '\n'.join(self.result.splitlines())
 
-    def process(self):
+    def process(self, print_results=True):
         process = subprocess.Popen(
             [
                 "psql",
@@ -31,4 +31,8 @@ class PostgresBackup:
             raise Exception('Non-zero return code!')
 
         self.result = output
-        print(self)
+
+        if print_results:
+            print(self)
+
+        return self.result

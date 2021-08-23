@@ -14,20 +14,20 @@ class BackupPostgres:
 
     def backup_postgres_db(self, file):
         try:
-            process = subprocess.Popen(
-                [
-                    'pg_dump',
-                    '-Fc',
-                    '--no-owner',
-                    f'--dbname=postgresql://{self.kwargs["user"]}:{self.kwargs["password"]}@'
-                    f'{self.kwargs["host"]}:{self.kwargs["port"]}/{self.kwargs["db"]}',
-                    '-f',
-                    file,
-                ],
-                stdout=subprocess.PIPE,
-            )
+            # 'dump_executable' can take any arbitrary executable, even from inside of a docker container
+            command = self.kwargs['dump_executable'].split() + [
+                '-Fc',
+                '--no-owner',
+                f'--dbname=postgresql://{self.kwargs["user"]}:{self.kwargs["password"]}@'
+                f'{self.kwargs["host"]}:{self.kwargs["port"]}/{self.kwargs["db"]}',
+                '-f',
+                file,
+            ]
+            process = subprocess.Popen(command, stdout=subprocess.PIPE, )
             output = process.communicate()[0]
             if process.returncode != 0:
+                # remove the file which was created
+                os.remove(file)
                 raise Exception(output)
             return output
         except Exception as e:
@@ -69,7 +69,6 @@ class Backup:
                 self.kwargs['compressed_file']
             ],
             'local': [
-                self.kwargs['sql_file'],
                 self.kwargs['compressed_file']
             ]
         }
@@ -78,6 +77,7 @@ class Backup:
     @property
     def db_kwargs(self):
         return {
+            'dump_executable': self.kwargs['dump_executable'],
             'user': self.kwargs['user'],
             'password': self.kwargs['password'],
             'host': self.kwargs['host'],
@@ -96,7 +96,7 @@ class Backup:
         )
         os.remove(src)
 
-    def local(self, src, compressed):
+    def local(self, compressed):
         """Move compressed backup into {LOCAL_BACKUP_PATH}."""
         backup_dir = self.config['LOCAL_BACKUP_PATH']
         os.makedirs(backup_dir, exist_ok=True)

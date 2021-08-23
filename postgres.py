@@ -47,14 +47,16 @@ class Processor:
             'list_dbs': pg_kwargs,
             'backup': {
                 **pg_kwargs,
+                'dump_executable': self.config.get('postgresql', 'dump_executable', fallback='pg_dump'),
                 'engine': 'local',
                 'config': aws_config,
-                'sql_file': filename,
+                'sql_file': f'/tmp/{filename}',
                 'compressed_file': filename_compressed,
             },
             'restore': {
                 **pg_kwargs,
                 'engine': 'local',
+                'restore_executable': self.config.get('postgresql', 'restore_executable', fallback='pg_restore'),
                 'config': aws_config,
                 'db': self.sys_args.dest_db if self.sys_args.dest_db else pg_kwargs['db'],
                 'restore_db': f"{pg_kwargs['db']}_restore",

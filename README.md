@@ -29,11 +29,13 @@ Utility to backup, restore and list Postgresql databases from/to AWS S3 (or loca
       path=./backups/
 
       [postgresql]
-      host=<your_psql_addr(probably 127.0.0.1)>
-      port=<your_psql_port(probably 5432)>
-      db=<your_db_name>
-      user=<your_username>
-      password=<your_password>
+      dump_executable=<custom pg_dump location>
+      restore_executable=<custom pg_restore location>
+      host=<psql host (127.0.0.1)>
+      port=<psql port (5432)>
+      db=<database>
+      user=<username>
+      password=<password>
 
 ### Usage
 
@@ -60,7 +62,7 @@ Utility to backup, restore and list Postgresql databases from/to AWS S3 (or loca
 ## Authors
 
 * **Val Feron** - *Initial work* - [github](https://github.com/valferon)
-* **Jonti** - *Expanding the feature, refactoring* - [github](https://github.com/jonti09)
+* **Jonti** - *Expanding the functionalities* - [github](https://github.com/jonti09)
 
 ## LicenseMIT License
 

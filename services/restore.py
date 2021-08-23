@@ -41,16 +41,14 @@ class Postgres:
 
     def restore(self, src):
         """Restore postgres db from a file."""
-        process = subprocess.Popen(
-            [
-                "pg_restore",
-                "--no-owner",
-                f'--dbname=postgresql://{self.kwargs["user"]}:{self.kwargs["password"]}@'
-                f'{self.kwargs["host"]}:{self.kwargs["port"]}/{self.kwargs["restore_db"]}',
-                src
-            ],
-            subprocess.PIPE
-        )
+        # 'restore_executable' can take any arbitrary executable, even from inside of a docker container
+        command = self.kwargs['restore_executable'].split() + [
+            "--no-owner",
+            f'--dbname=postgresql://{self.kwargs["user"]}:{self.kwargs["password"]}@'
+            f'{self.kwargs["host"]}:{self.kwargs["port"]}/{self.kwargs["restore_db"]}',
+            src
+        ]
+        process = subprocess.Popen(command, subprocess.PIPE)
 
         output = process.communicate()[0]
 
