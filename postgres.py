@@ -29,7 +29,7 @@ class Processor:
         pg_kwargs = self.pg_kwargs
         postgres_restore = "{}_restore".format(pg_kwargs['db'])
 
-        time_str = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         filename = f"backup-{time_str}-{pg_kwargs['db']}.dump"
         filename_compressed = f"{filename}.gz"
         restore_filename = "/tmp/restore.dump.gz"

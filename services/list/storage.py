@@ -40,3 +40,4 @@ class StorageBackup:
     def process(self):
         self.result = sorted(self.service(), reverse=True)
         print(self)
+        return self.result

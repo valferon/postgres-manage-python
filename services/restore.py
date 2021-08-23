@@ -1,8 +1,5 @@
-import gzip
-import os
 import shutil
 import subprocess
-from typing import Dict
 
 import boto3
 import psycopg2
@@ -56,7 +53,7 @@ class Postgres:
         output = process.communicate()[0]
 
         if int(process.returncode) != 0:
-            raise Exception(f"Command failed. Return code : {process.returncode}")
+            raise Exception(f"Command failed. Output: code [{process.returncode}]: {output}", )
 
         return output
 
@@ -136,15 +133,6 @@ class Restore:
             f"{self.config['LOCAL_BACKUP_PATH']}/{backup}",
             dest
         )
-        logger.info(f'{backup} loaded successfully!')
-
-    def extract(self, src):
-        dest, extension = os.path.splitext(src)
-
-        with gzip.open(src, "rb") as f_in, open(dest, "wb") as f_out:
-            f_out.writelines(f_in.readlines())
-
-        return dest
 
     def process(self):
         if not self.kwargs.get('date'):

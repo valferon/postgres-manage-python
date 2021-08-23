@@ -1,5 +1,5 @@
 from services.backup import Backup
-from services.list import ListStorageBackup, ListPostgresBackup
+from services.list import ListPostgresBackup, ListStorageBackup
 from services.restore import Restore
 
 
