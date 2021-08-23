@@ -1,12 +1,11 @@
 import os
-from typing import Dict
 
 import boto3
 
 
 class StorageBackup:
     def __init__(self, engine: str, config):
-        self.engine = engine
+        self.engine = engine.lower()
         self.config = config
         self.result = None
 
@@ -17,11 +16,7 @@ class StorageBackup:
 
     @property
     def service(self):
-        services = {
-            's3': self.s3,
-            'local': self.local
-        }
-        return services[self.engine.lower()]
+        return getattr(self, self.engine)
 
     def s3(self):
         # logger.info('Listing S3 bucket s3://{}/{} content :'.format(aws_bucket_name, aws_bucket_path))
@@ -37,12 +32,11 @@ class StorageBackup:
         try:
             return os.listdir(backup_dir)
         except FileNotFoundError as e:
-            print(
+            raise Exception(
                 f"Could not found {backup_dir} when searching for backups."
-                f"Check your .config file settings"
+                f"Check your config file settings"
             )
-            raise e
 
     def process(self):
         self.result = sorted(self.service(), reverse=True)
-        return self.result
+        print(self)

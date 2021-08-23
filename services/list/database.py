@@ -29,5 +29,6 @@ class PostgresBackup:
         if int(process.returncode) != 0:
             logger.error(f'Command failed with return code {process.returncode}')
             raise Exception('Non-zero return code!')
+
         self.result = output
-        return output
+        print(self)

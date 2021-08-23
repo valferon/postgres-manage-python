@@ -13,13 +13,12 @@ class BackupPostgres:
         self.kwargs = kwargs
 
     def backup_postgres_db(self, file):
-        """
-        Backup postgres db to a file.
-        """
         try:
             process = subprocess.Popen(
                 [
                     'pg_dump',
+                    '--clean',
+                    '--no-owner',
                     f'--dbname=postgresql://{self.kwargs["user"]}:{self.kwargs["password"]}@'
                     f'{self.kwargs["host"]}:{self.kwargs["port"]}/{self.kwargs["db"]}',
                     '-f',
@@ -29,22 +28,23 @@ class BackupPostgres:
             )
             output = process.communicate()[0]
             if process.returncode != 0:
-                logger('Command failed. Return code : {}'.format(process.returncode))
                 raise Exception(output)
             return output
         except Exception as e:
             logger.error(e)
             raise e
 
-    def compress_file(self, src):
-        compressed = f'{src}.gz'
+    def compress_file(self, src, compressed):
         with open(src, 'rb') as f_in, gzip.open(compressed, 'wb') as f_out:
             f_out.writelines(f_in.readlines())
-        return compressed
 
-    def backup(self, src):
-        self.backup_postgres_db(src)
-        return self.compress_file(src)
+    def clean_up(self, file):
+        os.remove(file)
+
+    def backup(self, sql_file, compressed_file):
+        self.backup_postgres_db(sql_file)
+        self.compress_file(sql_file, compressed_file)
+        self.clean_up(sql_file)
 
 
 class Backup:
@@ -101,10 +101,10 @@ class Backup:
         backup_dir = self.config['LOCAL_BACKUP_PATH']
         os.makedirs(backup_dir, exist_ok=True)
         shutil.move(
-            src,
-            f'{self.config["LOCAL_BACKUP_PATH"]}{compressed}'
+            compressed,
+            f'{self.config["LOCAL_BACKUP_PATH"]}{self.kwargs["compressed_file"]}'
         )
 
     def process(self):
-        self.kwargs['compressed_file'] = BackupPostgres(**self.db_kwargs).backup(self.kwargs['sql_file'])
+        BackupPostgres(**self.db_kwargs).backup(self.kwargs['sql_file'], self.kwargs['compressed_file'])
         self.service(*self.args)
