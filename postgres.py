@@ -27,12 +27,10 @@ class Processor:
         engine = self.config.get("setup", "storage_engine")
 
         pg_kwargs = self.pg_kwargs
-        postgres_restore = "{}_restore".format(pg_kwargs['db'])
 
         time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         filename = f"backup-{time_str}-{pg_kwargs['db']}.dump"
         filename_compressed = f"{filename}.gz"
-        restore_filename = "/tmp/restore.dump.gz"
 
         aws_config = {
             "AWS_BUCKET_NAME": self.config.get("S3", "bucket_name"),
@@ -59,9 +57,9 @@ class Processor:
                 'engine': 'local',
                 'config': aws_config,
                 'db': self.sys_args.dest_db if self.sys_args.dest_db else pg_kwargs['db'],
-                'restore_db': postgres_restore,
+                'restore_db': f"{pg_kwargs['db']}_restore",
                 'date': self.sys_args.date,
-                'dest': restore_filename
+                'dest': '/tmp/restore.dump.gz'
             },
         }
         return services[self.sys_args.action]

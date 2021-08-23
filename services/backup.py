@@ -17,7 +17,7 @@ class BackupPostgres:
             process = subprocess.Popen(
                 [
                     'pg_dump',
-                    '--clean',
+                    '-Fc',
                     '--no-owner',
                     f'--dbname=postgresql://{self.kwargs["user"]}:{self.kwargs["password"]}@'
                     f'{self.kwargs["host"]}:{self.kwargs["port"]}/{self.kwargs["db"]}',

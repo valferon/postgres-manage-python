@@ -1,3 +1,5 @@
+import gzip
+import os
 import shutil
 import subprocess
 
@@ -80,8 +82,9 @@ class Postgres:
         )
 
     def process(self, src):
+        self.create()
         self.restore(src)
-        self.switch(self.kwargs['temp_db'], self.kwargs['db'])
+        self.switch(self.kwargs['restore_db'], self.kwargs['db'])
 
 
 class Restore:
@@ -110,7 +113,7 @@ class Restore:
         backup = next(
             filter(
                 lambda _backup: date in _backup,
-                ListStorageBackup(self.engine, self.config).process()
+                ListStorageBackup(self.engine, self.config).process(print_results=False)
             ),
             None
         )
@@ -134,6 +137,14 @@ class Restore:
             dest
         )
 
+    def extract(self, src):
+        dest, extension = os.path.splitext(src)
+
+        with gzip.open(src, "rb") as f_in, open(dest, "wb") as f_out:
+            f_out.writelines(f_in.readlines())
+
+        return dest
+
     def process(self):
         if not self.kwargs.get('date'):
             raise Exception(
@@ -141,4 +152,5 @@ class Restore:
             )
 
         self.service(*self.args)
+        self.kwargs['dest'] = self.extract(self.kwargs['dest'])
         Postgres(**self.kwargs).process(self.kwargs['dest'])

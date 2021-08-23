@@ -37,7 +37,9 @@ class StorageBackup:
                 f"Check your config file settings"
             )
 
-    def process(self):
+    def process(self, print_results=True):
         self.result = sorted(self.service(), reverse=True)
-        print(self)
+
+        if print_results:
+            print(self)
         return self.result
