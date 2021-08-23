@@ -111,3 +111,5 @@ ENV/
 
 # Local backups
 /backups
+/bkup
+config
