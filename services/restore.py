@@ -44,6 +44,7 @@ class Postgres:
         # 'restore_executable' can take any arbitrary executable, even from inside of a docker container
         command = self.kwargs['restore_executable'].split() + [
             "--no-owner",
+            "--no-privileges",
             f'--dbname=postgresql://{self.kwargs["user"]}:{self.kwargs["password"]}@'
             f'{self.kwargs["host"]}:{self.kwargs["port"]}/{self.kwargs["restore_db"]}',
             src
