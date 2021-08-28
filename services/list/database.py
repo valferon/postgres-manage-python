@@ -1,11 +1,13 @@
 import subprocess
+from configparser import ConfigParser
+from functools import cached_property
 
 from services import logger
 
 
 class PostgresBackup:
-    def __init__(self, **kwargs):
-        self.kwargs = kwargs
+    def __init__(self, config: ConfigParser):
+        self.config = config
         self.result = None
 
     def __str__(self):
@@ -14,13 +16,23 @@ class PostgresBackup:
 
         return '\n'.join(self.result.splitlines())
 
+    @cached_property
+    def pg_kwargs(self):
+        return {
+            'user': self.config.get('postgresql', 'user'),
+            'password': self.config.get('postgresql', 'password'),
+            'host': self.config.get('postgresql', 'host'),
+            'port': self.config.get('postgresql', 'port'),
+            'db': self.config.get('postgresql', 'db')
+        }
+
     def process(self, print_results=True):
         process = subprocess.Popen(
             [
-                "psql",
-                f"--dbname=postgresql://{self.kwargs['user']}:{self.kwargs['password']}@"
-                f"{self.kwargs['host']}:{self.kwargs['port']}/{self.kwargs['db']}",
-                "--list",
+                'psql',
+                f"--dbname=postgresql://{self.pg_kwargs['user']}:{self.pg_kwargs['password']}@"
+                f"{self.pg_kwargs['host']}:{self.pg_kwargs['port']}/{self.pg_kwargs['db']}",
+                '--list',
             ],
             stdout=subprocess.PIPE,
         )

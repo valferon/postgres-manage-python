@@ -2,109 +2,101 @@ import gzip
 import os
 import shutil
 import subprocess
+from configparser import ConfigParser
+from datetime import datetime
 
 import boto3
 
-from services import logger
+from services import logger, tmp_dir
 
 
 class BackupPostgres:
-    def __init__(self, **kwargs):
-        self.kwargs = kwargs
+    def __init__(self, config: ConfigParser):
+        self.config = config
 
-    def backup_postgres_db(self, file):
+    def backup_postgres_db(self):
+        user = self.config.get('src', 'user')
+        password = self.config.get('src', 'password')
+        host = self.config.get('src', 'host')
+        port = self.config.get('src', 'port')
+        db = self.config.get('src', 'db')
+
+        file = os.path.join(tmp_dir, db)
         try:
             # 'dump_executable' can take any arbitrary executable, even from inside of a docker container
-            command = self.kwargs['dump_executable'].split() + [
+            dump_executable = self.config.get('command', 'dump', fallback='pg_dump')
+            command = dump_executable.split() + [
                 '-Fc',
                 '--no-owner',
-                f'--dbname=postgresql://{self.kwargs["user"]}:{self.kwargs["password"]}@'
-                f'{self.kwargs["host"]}:{self.kwargs["port"]}/{self.kwargs["db"]}',
+                f'--dbname=postgresql://{user}:{password}@{host}:{port}/{db}',
                 '-f',
                 file,
             ]
-            process = subprocess.Popen(command, stdout=subprocess.PIPE, )
+            process = subprocess.Popen(command, stdout=subprocess.PIPE)
             output = process.communicate()[0]
             if process.returncode != 0:
                 # remove the file which was created
-                os.remove(file)
+                self.clean_up(file)
                 raise Exception(output)
-            return output
+            return file
         except Exception as e:
             logger.error(e)
             raise e
 
     def compress_file(self, src, compressed):
+        print(src, compressed)
         with open(src, 'rb') as f_in, gzip.open(compressed, 'wb') as f_out:
             f_out.writelines(f_in.readlines())
 
     def clean_up(self, file):
-        os.remove(file)
+        try:
+            os.remove(file)
+        except PermissionError:
+            logger.error(f'Could not remove the temp file {file}!')
 
-    def backup(self, sql_file, compressed_file):
-        self.backup_postgres_db(sql_file)
-        self.compress_file(sql_file, compressed_file)
-        self.clean_up(sql_file)
+    def backup(self, compressed_file):
+        sql_file_path = self.backup_postgres_db()
+        self.compress_file(sql_file_path, compressed_file)
+        self.clean_up(sql_file_path)
 
 
 class Backup:
-    def __init__(self, engine: str, config, **kwargs):
-        self.engine = engine.lower()
+    def __init__(self, config: ConfigParser):
         self.config = config
-        self.kwargs = kwargs
+
+        time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self.filename = f'backup-{time_str}-{self.config.get("src", "db")}.dump'
+        self.file_path = os.path.join(tmp_dir, self.filename)
+        self.compressed_file = f'{self.filename}.gz'
 
     @property
     def service(self):
-        services = {
-            's3': self.s3,
-            'local': self.local,
-        }
-        return services[self.engine]
+        # dynamically return the relevant method
+        return getattr(
+            self,
+            self.config.get('setup', 'engine', fallback='LOCAL').lower()
+        )
 
-    @property
-    def args(self):
-        args = {
-            's3': [
-                self.kwargs['sql_file'],
-                self.kwargs['compressed_file']
-            ],
-            'local': [
-                self.kwargs['compressed_file']
-            ]
-        }
-        return args[self.engine]
-
-    @property
-    def db_kwargs(self):
-        return {
-            'dump_executable': self.kwargs['dump_executable'],
-            'user': self.kwargs['user'],
-            'password': self.kwargs['password'],
-            'host': self.kwargs['host'],
-            'port': self.kwargs['port'],
-            'db': self.kwargs['db'],
-        }
-
-    def s3(self, src, location):
+    def s3(self):
         """
         Upload a file to an AWS S3 bucket.
         """
         boto3.client('s3').upload_file(
-            src,
-            self.config['AWS_BUCKET_NAME'],
-            f'{self.config["AWS_BUCKET_PATH"]}{location}',
+            self.file_path,
+            self.config.get('S3', 'bucket_name'),
+            f'{self.config.get("S3", "bucket_backup_path")}{self.compressed_file}',
         )
-        os.remove(src)
+        os.remove(self.file_path)
 
-    def local(self, compressed):
-        """Move compressed backup into {LOCAL_BACKUP_PATH}."""
-        backup_dir = self.config['LOCAL_BACKUP_PATH']
+    def local(self):
+        # Move compressed backup into {LOCAL_BACKUP_PATH}
+        backup_dir = self.config.get('local_storage', 'path', fallback='./backups/')
         os.makedirs(backup_dir, exist_ok=True)
-        shutil.move(
-            compressed,
-            f'{self.config["LOCAL_BACKUP_PATH"]}{self.kwargs["compressed_file"]}'
-        )
+        dest = os.path.join(backup_dir, self.compressed_file)
+
+        print(self.compressed_file, dest)
+        shutil.move(self.compressed_file, dest)
 
     def process(self):
-        BackupPostgres(**self.db_kwargs).backup(self.kwargs['sql_file'], self.kwargs['compressed_file'])
-        self.service(*self.args)
+        BackupPostgres(self.config).backup(self.compressed_file)
+        self.service()

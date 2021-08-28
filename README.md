@@ -27,10 +27,21 @@ Utility to backup, restore and list Postgresql databases from/to AWS S3 (or loca
 
       [local_storage]
       path=./backups/
+      
+      [command]
+      # these commands provide a way to override the default ones, 
+      # if not provided, we use the system commands 
+      dump=<custom_dump_command>
+      restore=<custom_restore_command>
 
-      [postgresql]
-      dump_executable=<custom pg_dump location>
-      restore_executable=<custom pg_restore location>
+      [src]
+      host=<psql host (127.0.0.1)>
+      port=<psql port (5432)>
+      db=<database>
+      user=<username>
+      password=<password>
+    
+      [dest]
       host=<psql host (127.0.0.1)>
       port=<psql port (5432)>
       db=<database>
@@ -41,30 +52,30 @@ Utility to backup, restore and list Postgresql databases from/to AWS S3 (or loca
 
 * List databases on a postgresql server
 
-      python3 manage_postgres_db.py --configfile sample.config --action list_dbs --verbose true
+      python3 postgres.py --configfile sample.config --action list_dbs
 
 * Create database backup and store it (based on config file details)
 
-      python3 manage_postgres_db.py --configfile sample.config --action backup --verbose true
+      python3 postgres.py --configfile sample.config --action backup
 
 * List previously created database backups available on storage engine
 
-      python3 manage_postgres_db.py --configfile sample.config --action list --verbose true
+      python3 postgres.py --configfile sample.config --action list
 
 * Restore previously created database backups available on storage engine (check available dates with *list* action)
 
-      python3 manage_postgres_db.py --configfile sample.config --action restore --date "YYYY-MM-dd" --verbose true
+      python3 postgres.py --configfile sample.config --action restore --date "YYYY-MM-dd"
 
-* Restore previously created database backups into a new destination database
+* Restore previously created database backups into a provided destination database
 
-      python3 manage_postgres_db.py --configfile sample.config --action restore --date "YYYY-MM-dd" --dest-db new_DB_name
+      python3 postgres.py --configfile sample.config --action restore --date "YYYY-MM-dd"
 
 ## Authors
 
 * **Val Feron** - *Initial work* - [github](https://github.com/valferon)
 * **Jonti** - *Expanding the functionalities* - [github](https://github.com/jonti09)
 
-## LicenseMIT License
+## License: MIT
 
 Copyright (c) valferon
 

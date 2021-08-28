@@ -1,11 +1,11 @@
 import os
+from configparser import ConfigParser
 
 import boto3
 
 
 class StorageBackup:
-    def __init__(self, engine: str, config):
-        self.engine = engine.lower()
+    def __init__(self, config: ConfigParser):
         self.config = config
         self.result = None
 
@@ -16,25 +16,28 @@ class StorageBackup:
 
     @property
     def service(self):
-        return getattr(self, self.engine)
+        # dynamically return the relevant method
+        return getattr(
+            self,
+            self.config.get('setup', 'engine', fallback='LOCAL').lower()
+        )
 
     def s3(self):
-        # logger.info('Listing S3 bucket s3://{}/{} content :'.format(aws_bucket_name, aws_bucket_path))
-        s3_client = boto3.client("s3")
+        s3_client = boto3.client('s3')
         s3_objects = s3_client.list_objects_v2(
-            Bucket=self.config['AWS_BUCKET_NAME'],
-            Prefix=self.config['AWS_BUCKET_PATH'],
+            Bucket=self.config.get('S3', 'bucket_name'),
+            Prefix=self.config.get('S3', 'bucket_backup_path'),
         )
-        return [s3_content["Key"] for s3_content in s3_objects["Contents"]]
+        return [s3_content['Key'] for s3_content in s3_objects['Contents']]
 
     def local(self):
-        backup_dir = self.config['LOCAL_BACKUP_PATH']
+        backup_dir = self.config.get('local_storage', 'path', fallback='./backups/')
         try:
             return os.listdir(backup_dir)
-        except FileNotFoundError as e:
+        except FileNotFoundError:
             raise Exception(
-                f"Could not found {backup_dir} when searching for backups."
-                f"Check your config file settings"
+                f'Could not found {backup_dir} when searching for backups.'
+                f'Check your config file settings'
             )
 
     def process(self, print_results=True):

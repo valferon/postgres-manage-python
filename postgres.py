@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 import argparse
 import configparser
-import datetime
 from functools import cached_property
 
 from services.factory import ArgsFactory
@@ -24,44 +23,15 @@ class Processor:
 
     @property
     def kwargs(self):
-        engine = self.config.get("setup", "storage_engine")
-
-        pg_kwargs = self.pg_kwargs
-
-        time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        filename = f"backup-{time_str}-{pg_kwargs['db']}.dump"
-        filename_compressed = f"{filename}.gz"
-
-        aws_config = {
-            "AWS_BUCKET_NAME": self.config.get("S3", "bucket_name"),
-            "AWS_BUCKET_PATH": self.config.get("S3", "bucket_backup_path"),
-            "BACKUP_PATH": "/tmp/",
-            "LOCAL_BACKUP_PATH": self.config.get("local_storage", "path", fallback="./backups/"),
-        }
+        default = {'config': self.config}
 
         services = {
-            'list': {
-                'engine': engine,
-                'config': aws_config
-            },
-            'list_dbs': pg_kwargs,
-            'backup': {
-                **pg_kwargs,
-                'dump_executable': self.config.get('postgresql', 'dump_executable', fallback='pg_dump'),
-                'engine': 'local',
-                'config': aws_config,
-                'sql_file': f'/tmp/{filename}',
-                'compressed_file': filename_compressed,
-            },
+            'list': default,
+            'list_dbs': default,
+            'backup': default,
             'restore': {
-                **pg_kwargs,
-                'engine': 'local',
-                'restore_executable': self.config.get('postgresql', 'restore_executable', fallback='pg_restore'),
-                'config': aws_config,
-                'db': self.sys_args.dest_db if self.sys_args.dest_db else pg_kwargs['db'],
-                'restore_db': f"{pg_kwargs['db']}_restore",
+                **default,
                 'date': self.sys_args.date,
-                'dest': '/tmp/restore.dump.gz'
             },
         }
         return services[self.sys_args.action]
@@ -72,27 +42,27 @@ class Processor:
         return config
 
     def get_sys_args(self):
-        args_parser = argparse.ArgumentParser(description="Postgres Database Management")
+        args_parser = argparse.ArgumentParser(description='Postgres Database Management')
         args_parser.add_argument(
-            "--action",
-            metavar="action",
-            choices=["list", "list_dbs", "restore", "backup"],
+            '--action',
+            metavar='action',
+            choices=['list', 'list_dbs', 'restore', 'backup'],
             required=True,
         )
         args_parser.add_argument(
-            "--date",
-            metavar="YYYY-MM-dd",
-            help="Date to use for restore (shown with --action list)",
+            '--date',
+            metavar='YYYY-MM-dd',
+            help='Date to use for restore (shown with --action list)',
         )
         args_parser.add_argument(
-            "--dest-db",
-            metavar="dest_db",
+            '--dest-db',
+            metavar='dest_db',
             default=None,
-            help="Name of the new restored database",
+            help='Name of the new restored database',
         )
-        args_parser.add_argument("--verbose", default=False, help="Verbose output")
+        args_parser.add_argument('--verbose', default=False, help='Verbose output')
         args_parser.add_argument(
-            "--configfile", required=True, help="Database configuration file"
+            '--configfile', required=True, help='Database configuration file'
         )
         return args_parser.parse_args()
 
@@ -101,5 +71,5 @@ class Processor:
         service.process()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     Processor().process()
